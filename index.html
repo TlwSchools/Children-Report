@@ -5,6 +5,30 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Tadika Langkah Wajar - Portal Pengurusan</title>
     <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+        import { getFirestore, doc, setDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyC2bL0em2KOaOE-0AHdsezZVoLWOJJGkbg",
+            authDomain: "tadika-langkah-wajar.firebaseapp.com",
+            projectId: "tadika-langkah-wajar",
+            storageBucket: "tadika-langkah-wajar.firebasestorage.app",
+            messagingSenderId: "1012197725108",
+            appId: "1:1012197725108:web:c3034c127846a4e0b258e1"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+
+        window.db = db;
+        window.cloudDoc = doc;
+        window.cloudSetDoc = setDoc;
+
+        // 启动实时监听
+        listenToCloudDatabase();
+    </script>
 </head>
 <body class="bg-gray-100 text-gray-800 font-sans pb-12">
 
@@ -13,7 +37,7 @@
             <h1 class="text-xl font-bold">Tadika Langkah Wajar Portal</h1>
             <div class="flex items-center gap-2">
                 <label class="text-sm font-medium">User:</label>
-                <select id="roleSelect" class="bg-white text-gray-800 px-3 py-1 rounded text-sm font-medium" onchange="switchRole()">
+                <select id="roleSelect" class="bg-white text-gray-800 px-3 py-1 rounded text-sm font-medium text-gray-700" onchange="switchRole()">
                     <option value="Principal (Principal)">Principal (Full Access)</option>
                 </select>
             </div>
@@ -21,7 +45,6 @@
     </header>
 
     <div class="container mx-auto px-4 grid grid-cols-1 lg:grid-cols-3 gap-8">
-        
         <div class="lg:col-span-2 space-y-8">
             <section id="principalTeacherSection" class="bg-gradient-to-r from-purple-50 to-indigo-50 p-6 rounded-xl border border-purple-100 shadow-sm">
                 <h2 class="text-lg font-semibold mb-4 text-purple-800">👩‍🏫 Staff Management (Principal Only)</h2>
@@ -69,7 +92,7 @@
                         <label class="block text-xs text-gray-500 mb-1">Upload Activity Photo:</label>
                         <input type="file" id="actPhoto" accept="image/*" class="border p-2 rounded w-full text-sm bg-gray-50">
                     </div>
-                    <button onclick="saveActivity()" class="bg-green-600 text-white px-5 py-2 rounded text-sm font-medium hover:bg-green-700 transition">💾 Save To Timeline</button>
+                    <button onclick="saveActivity()" class="bg-green-600 text-white px-5 py-2 rounded text-sm font-medium hover:bg-green-700 transition">💾 Save To Cloud Timeline</button>
                 </div>
             </section>
         </div>
@@ -96,44 +119,47 @@
             </section>
 
             <section id="logSection" class="bg-gray-900 text-green-400 p-4 rounded-xl font-mono text-[11px] h-44 overflow-y-auto shadow-inner">
-                <h3 class="text-white font-bold mb-1 border-b border-gray-700 pb-1">🖥️ Audit Log</h3>
+                <h3 class="text-white font-bold mb-1 border-b border-gray-700 pb-1">🖥️ Cloud Audit Log</h3>
                 <div id="logList" class="space-y-0.5"></div>
             </section>
             
             <div>
-                <button onclick="resetDatabase()" class="text-xs text-red-500 hover:text-red-700 hover:underline transition font-bold">⚠️ Reset Database</button>
+                <button onclick="resetDatabase()" class="text-xs text-red-500 hover:text-red-700 font-bold hover:underline">⚠️ Reset Cloud System</button>
             </div>
         </div>
     </div>
 
     <div id="largeReportPopup" class="fixed inset-0 bg-black/80 backdrop-blur-xs z-50 flex justify-center items-start overflow-y-auto p-2 md:p-6 hidden">
         <div class="bg-white w-full md:max-w-md my-2 md:my-6 p-5 rounded-2xl shadow-2xl relative">
-            
-            <button onclick="closeLargeReportPopup()" class="absolute top-3 right-3 bg-red-500 hover:bg-red-600 text-white font-bold px-4 py-1.5 rounded-full text-xs transition shadow-md z-10">
-                ✕ Close
-            </button>
-
-            <div class="text-center font-black text-xl md:text-2xl text-blue-700 border-b-4 border-double border-blue-700 pb-2 mb-5 tracking-widest uppercase">
-                TADIKA LANGKAH WAJAR
-            </div>
-
-            <div id="popupDynamicContent">
-                </div>
+            <button onclick="closeLargeReportPopup()" class="absolute top-3 right-3 bg-red-500 hover:bg-red-600 text-white font-bold px-4 py-1.5 rounded-full text-xs transition shadow-md z-10">✕ Close</button>
+            <div class="text-center font-black text-xl md:text-2xl text-blue-700 border-b-4 border-double border-blue-700 pb-2 mb-5 tracking-widest uppercase">TADIKA LANGKAH WAJAR</div>
+            <div id="popupDynamicContent"></div>
         </div>
     </div>
 
     <script>
-        let students = JSON.parse(localStorage.getItem('tlw_students_v6')) || [];
-        let teachers = JSON.parse(localStorage.getItem('tlw_teachers_v6')) || ["Teacher A", "Teacher B"];
-        let auditLogs = JSON.parse(localStorage.getItem('tlw_logs_v6')) || [];
-        let selectedStudentId = null;
+        let students = []; let teachers = ["Teacher A", "Teacher B"]; let auditLogs = []; let selectedStudentId = null;
 
-        function saveToDatabase() {
-            localStorage.setItem('tlw_students_v6', JSON.stringify(students));
-            localStorage.setItem('tlw_teachers_v6', JSON.stringify(teachers));
-            localStorage.setItem('tlw_logs_v6', JSON.stringify(auditLogs));
+        function listenToCloudDatabase() {
+            if (!window.db) { setTimeout(listenToCloudDatabase, 100); return; }
+            import("https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js").then((fs) => {
+                fs.onSnapshot(window.cloudDoc(window.db, "tadika_data", "school_master"), (snapshot) => {
+                    if (snapshot.exists()) {
+                        const cloudData = snapshot.data();
+                        students = cloudData.students || []; teachers = cloudData.teachers || ["Teacher A", "Teacher B"]; auditLogs = cloudData.auditLogs || [];
+                        loadTeachersDropdown(); renderStudents(); renderLogs();
+                        if (selectedStudentId) { const cs = students.find(s => s.id === selectedStudentId); if (cs) populateDateFilter(cs); }
+                    } else { pushToCloud(); }
+                });
+            });
         }
 
+        function pushToCloud() {
+            if(!window.db) return;
+            window.cloudSetDoc(window.cloudDoc(window.db, "tadika_data", "school_master"), { students: students, teachers: teachers, auditLogs: auditLogs });
+        }
+
+        // 极致图片压缩：降低高宽至最适合Firestore文本吞吐的大小，保证照片显示清晰的同时秒级同步
         function processAndCompressImage(fileElement, maxWidth, callback) {
             if (fileElement.files && fileElement.files[0]) {
                 const reader = new FileReader();
@@ -146,7 +172,7 @@
                         canvas.width = width; canvas.height = height;
                         const ctx = canvas.getContext('2d');
                         ctx.drawImage(img, 0, 0, width, height);
-                        callback(canvas.toDataURL('image/jpeg', 0.7));
+                        callback(canvas.toDataURL('image/jpeg', 0.4)); // 40%高压缩率，完美塞进文字通道
                     };
                     img.src = e.target.result;
                 };
@@ -155,23 +181,20 @@
         }
 
         function loadTeachersDropdown() {
-            const roleSelect = document.getElementById('roleSelect');
+            const roleSelect = document.getElementById('roleSelect'); const currentVal = roleSelect.value;
             roleSelect.innerHTML = '<option value="Principal (Principal)">Principal (Full Access)</option>';
-            teachers.forEach(t => {
-                const option = document.createElement('option');
-                option.value = `${t} (Teacher)`; option.text = t; roleSelect.add(option);
-            });
+            teachers.forEach(t => { const option = document.createElement('option'); option.value = `${t} (Teacher)`; option.text = t; roleSelect.add(option); });
+            if(currentVal) roleSelect.value = currentVal;
         }
 
         function addTeacher() {
             const name = document.getElementById('newTeacherName').value.trim();
-            if (!name) return alert("Please enter the teacher's name!");
-            if (teachers.includes(name)) return alert("This teacher is already registered!");
-            teachers.push(name); logAction(`Added teacher: ${name}`); saveToDatabase(); loadTeachersDropdown();
-            document.getElementById('newTeacherName').value = ''; alert(`Teacher "${name}" added successfully!`);
+            if (!name) return alert("Please enter name!");
+            if (teachers.includes(name)) return alert("Teacher already exists!");
+            teachers.push(name); logAction(`Added teacher: ${name}`); pushToCloud();
+            document.getElementById('newTeacherName').value = '';
         }
 
-        // 卡片渲染优化，适配小屏
         function renderStudents() {
             const grid = document.getElementById('studentGrid'); grid.innerHTML = '';
             students.forEach(s => {
@@ -179,29 +202,25 @@
                     <div onclick="selectStudent(${s.id})" class="bg-white border-2 ${selectedStudentId === s.id ? 'border-blue-500 ring-2' : 'border-gray-100'} rounded-xl p-3 text-center cursor-pointer hover:shadow-xs transition">
                         <img src="${s.avatar}" class="w-12 h-12 object-cover rounded-full mx-auto mb-1 border">
                         <h3 class="font-bold text-gray-800 text-xs truncate">${s.name}</h3>
-                        <p class="text-[10px] text-gray-400">${s.age} Y/O</p>
+                        <p class="text-[10px] text-gray-400">${s.age} Y/O (${s.logs ? s.logs.length : 0} logs)</p>
                     </div>`;
             });
         }
 
         function addStudent() {
-            const name = document.getElementById('newStudentName').value.trim();
-            const age = document.getElementById('newStudentAge').value;
-            const photoInput = document.getElementById('newStudentPhoto');
-            if (!name || !age) return alert("Please fill fields!");
+            const name = document.getElementById('newStudentName').value.trim(); const age = document.getElementById('newStudentAge').value; const photoInput = document.getElementById('newStudentPhoto');
+            if (!name || !age) return alert("Please fill Name and Age!");
 
-            processAndCompressImage(photoInput, 200, function(compressedImg) {
+            processAndCompressImage(photoInput, 120, function(compressedImg) {
                 const finalAvatar = compressedImg || "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='100' height='100' viewBox='0 0 100 100'><circle cx='50' cy='50' r='40' fill='%233b82f6'/><text x='50%' y='55%' font-size='20' fill='white' text-anchor='middle'>👶</text></svg>";
-                const newId = Date.now(); students.push({ id: newId, name, age, avatar: finalAvatar, logs: [] });
-                logAction(`Registered student: ${name}`); saveToDatabase(); renderStudents();
+                students.push({ id: Date.now(), name, age, avatar: finalAvatar, logs: [] });
+                logAction(`Registered student: ${name}`); pushToCloud();
                 document.getElementById('newStudentName').value = ''; document.getElementById('newStudentAge').value = ''; photoInput.value = '';
-                alert(`Student "${name}" registered successfully!`);
             });
         }
 
         function selectStudent(id) {
-            selectedStudentId = id; renderStudents();
-            const student = students.find(s => s.id === id);
+            selectedStudentId = id; renderStudents(); const student = students.find(s => s.id === id);
             document.getElementById('activityFormSection').classList.remove('hidden');
             document.getElementById('selectedStudentName').innerText = student.name;
             document.getElementById('actDate').value = new Date().toISOString().split('T')[0];
@@ -211,25 +230,23 @@
         }
 
         function saveActivity() {
-            if (!selectedStudentId) return;
-            const student = students.find(s => s.id === selectedStudentId);
-            const date = document.getElementById('actDate').value;
-            const time = document.getElementById('actTime').value;
-            const desc = document.getElementById('actDesc').value.trim();
+            if (!selectedStudentId) return; const student = students.find(s => s.id === selectedStudentId);
+            const date = document.getElementById('actDate').value; const time = document.getElementById('actTime').value; const desc = document.getElementById('actDesc').value.trim();
             if (!desc) return alert("Please enter description!");
 
-            processAndCompressImage(document.getElementById('actPhoto'), 800, function(compressedImg) {
+            // 存入纯Firestore，限制高宽最大为500像素，保证大屏截图清晰，体积非常小
+            processAndCompressImage(document.getElementById('actPhoto'), 500, function(compressedImg) {
                 if (!student.logs) student.logs = [];
                 student.logs.push({ id: Date.now(), date: date, time: time, desc: desc, photo: compressedImg || "" });
                 student.logs.sort((a, b) => new Date(b.date + ' ' + b.time) - new Date(a.date + ' ' + a.time));
-                logAction(`Added history log for [${student.name}]`); saveToDatabase(); renderStudents(); populateDateFilter(student, date);
-                alert("Activity log saved!"); document.getElementById('actDesc').value = ""; document.getElementById('actPhoto').value = "";
+                logAction(`Added log for [${student.name}]`); pushToCloud();
+                document.getElementById('actDesc').value = ""; document.getElementById('actPhoto').value = "";
+                alert("Saved and synchronized cloud successfully!");
             });
         }
 
         function populateDateFilter(student, defaultDate = null) {
-            const filter = document.getElementById('reportDateFilter');
-            const triggerBtn = document.getElementById('popupTriggerBtn');
+            const filter = document.getElementById('reportDateFilter'); const triggerBtn = document.getElementById('popupTriggerBtn'); const currentSelection = filter.value;
             filter.innerHTML = '';
             if (!student.logs || student.logs.length === 0) {
                 filter.innerHTML = '<option value="">-- No Records --</option>';
@@ -238,16 +255,15 @@
             }
             const uniqueDates = [...new Set(student.logs.map(log => log.date))];
             uniqueDates.forEach(date => { const option = document.createElement('option'); option.value = date; option.text = date; filter.add(option); });
-            const targetDate = defaultDate && uniqueDates.includes(defaultDate) ? defaultDate : uniqueDates[0];
+            let targetDate = defaultDate && uniqueDates.includes(defaultDate) ? defaultDate : uniqueDates[0];
+            if(!defaultDate && uniqueDates.includes(currentSelection)) targetDate = currentSelection;
             filter.value = targetDate; triggerBtn.disabled = false; triggerBtn.classList.remove('cursor-not-allowed', 'bg-gray-300');
             updateMiniPreview(student, targetDate);
         }
 
         function handleDateFilterChange() {
-            if (!selectedStudentId) return;
-            const student = students.find(s => s.id === selectedStudentId);
-            const selectedDate = document.getElementById('reportDateFilter').value;
-            updateMiniPreview(student, selectedDate);
+            if (!selectedStudentId) return; const student = students.find(s => s.id === selectedStudentId);
+            const selectedDate = document.getElementById('reportDateFilter').value; updateMiniPreview(student, selectedDate);
         }
 
         function updateMiniPreview(student, targetDate) {
@@ -258,13 +274,9 @@
         }
 
         function openLargeReportPopup() {
-            if (!selectedStudentId) return;
-            const student = students.find(s => s.id === selectedStudentId);
-            const selectedDate = document.getElementById('reportDateFilter').value;
-            if (!selectedDate) return;
-
-            const dayLogs = student.logs.filter(log => log.date === selectedDate);
-            const popupBody = document.getElementById('popupDynamicContent');
+            if (!selectedStudentId) return; const student = students.find(s => s.id === selectedStudentId);
+            const selectedDate = document.getElementById('reportDateFilter').value; if (!selectedDate) return;
+            const dayLogs = student.logs.filter(log => log.date === selectedDate); const popupBody = document.getElementById('popupDynamicContent');
 
             let html = `
                 <div class="flex items-center gap-3 border-b border-gray-100 pb-3 mb-4">
@@ -285,7 +297,6 @@
                         ${log.photo ? `<img src="${log.photo}" class="mt-1 w-full h-auto object-cover rounded-xl border border-gray-200">` : ''}
                     </div>`;
             });
-
             html += `</div>`; popupBody.innerHTML = html;
             document.getElementById('largeReportPopup').classList.remove('hidden');
         }
@@ -295,20 +306,18 @@
         function logAction(msg) {
             const now = new Date().toLocaleTimeString(); const user = document.getElementById('roleSelect').value;
             const fullLog = `<div>[${now}] <b>${user}</b>: ${msg}</div>`; auditLogs.unshift(fullLog);
-            if (auditLogs.length > 25) auditLogs.pop(); saveToDatabase(); renderLogs();
+            if (auditLogs.length > 20) auditLogs.pop();
         }
 
         function renderLogs() { document.getElementById('logList').innerHTML = auditLogs.join(''); }
-        function switchRole() { logAction("Changed perspective."); }
+        function switchRole() { logAction("Changed perspective."); pushToCloud(); }
         
         function resetDatabase() {
-            if (confirm("Reset system?")) {
-                localStorage.removeItem('tlw_students_v6'); localStorage.removeItem('tlw_teachers_v6'); localStorage.removeItem('tlw_logs_v6');
-                alert("Database cleared!"); location.reload();
+            if (confirm("Are you sure you want to clear ALL cloud data?")) {
+                students = []; teachers = ["Teacher A", "Teacher B"]; auditLogs = []; pushToCloud();
+                alert("Cloud system reset completed!");
             }
         }
-
-        window.onload = function() { loadTeachersDropdown(); renderStudents(); renderLogs(); };
     </script>
 </body>
 </html>
